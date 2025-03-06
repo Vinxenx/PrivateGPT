@@ -385,34 +385,27 @@ class PrivateGptUi:
             return []
 
     # Function to change the model
-    def _change_model(self, model_name: str) -> None:
-        """Change the current Ollama model."""
-        if not model_name or model_name == self._current_model:
-            return
-            
+    def _change_model(self, model_name: str) -> str:
+        """Change the Ollama model to the selected one"""
         try:
-            # Update the current model in our settings
-            # Note: This only changes it for the current session, not in the YAML file
-            settings().ollama.llm_model = model_name
-            self._current_model = model_name
-            logger.info(f"Changed model to: {model_name}")
-            
-            # Return message and JS to refresh the page
-            refresh_js = """
-            setTimeout(function() {
-                window.location.reload();
-            }, 1500);
-            """
-            return [
-                gr.update(value=f"Changing model to: {model_name}. Page will refresh..."),
-                gr.update(value=refresh_js)
-            ]
+            if model_name:
+                logger.info(f"Changing model to {model_name}")
+                # Stelle sicher, dass wir den richtigen Pfad zum Modell verwenden
+                settings().ollama.llm_model = model_name
+                self._current_model = model_name
+                # HTML mit JavaScript zurückgeben, um die Seite neu zu laden
+                return f"""
+                    <script>
+                    setTimeout(function() {{
+                        window.location.reload();
+                    }}, 1500);
+                    </script>
+                    Modell zu {model_name} gewechselt. Seite wird neu geladen...
+                """
+            return "Kein Modell ausgewählt"
         except Exception as e:
             logger.error(f"Error changing model: {e}")
-            return [
-                gr.update(value=f"Error changing model: {e}"),
-                gr.update(value="")
-            ]
+            return f"Fehler beim Wechseln des Modells: {e}"
 
     # Function to save the current model selection to the settings file
     def _save_model_to_config(self) -> str:
@@ -512,14 +505,11 @@ class PrivateGptUi:
                             interactive=False
                         )
                         
-                        # JavaScript component to handle page refresh
-                        js_refresh = gr.Javascript(visible=False)
-                        
                         # Setup button click handlers
                         model_change_button.click(
                             fn=self._change_model,
                             inputs=model_selector,
-                            outputs=[model_status, js_refresh]
+                            outputs=model_status,
                         )
                         
                         refresh_models_button.click(
