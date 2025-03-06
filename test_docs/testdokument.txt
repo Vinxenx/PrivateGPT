@@ -1,0 +1,9 @@
+Dies ist ein Testdokument für PrivateGPT.
+
+Es enthält einige Informationen, die später abgefragt werden können:
+
+- PrivateGPT ist ein Werkzeug zur privaten Dokumentenanalyse
+- Die Software funktioniert vollständig lokal und benötigt keine Internetverbindung
+- Man kann Dokumente hochladen und Fragen dazu stellen
+- Die Antworten werden durch ein lokales KI-Modell generiert
+- Der Datenschutz bleibt gewahrt, da keine Daten das System verlassen 
