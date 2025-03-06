@@ -3,6 +3,9 @@
 import base64
 import logging
 import time
+import requests
+import yaml
+import os
 from collections.abc import Iterable
 from enum import Enum
 from pathlib import Path
@@ -105,6 +108,9 @@ class PrivateGptUi:
             settings().ui.default_mode, Modes.RAG_MODE
         )
         self._system_prompt = self._get_default_system_prompt(self._default_mode)
+        
+        # Get the current model from settings
+        self._current_model = settings().ollama.llm_model
 
     def _chat(
         self, message: str, history: list[list[str]], mode: Modes, *_: Any
@@ -363,6 +369,84 @@ class PrivateGptUi:
             gr.components.Textbox(self._selected_filename),
         ]
 
+    # Function to get available Ollama models
+    def _get_available_ollama_models(self) -> list[str]:
+        """Get a list of all available models in Ollama."""
+        try:
+            # Use the configured Ollama API base URL
+            api_base = settings().ollama.api_base
+            response = requests.get(f"{api_base}/api/tags")
+            if response.status_code == 200:
+                models = response.json().get("models", [])
+                return [model.get("name") for model in models if model.get("name")]
+            return []
+        except Exception as e:
+            logger.error(f"Error fetching Ollama models: {e}")
+            return []
+
+    # Function to change the model
+    def _change_model(self, model_name: str) -> None:
+        """Change the current Ollama model."""
+        if not model_name or model_name == self._current_model:
+            return
+            
+        try:
+            # Update the current model in our settings
+            # Note: This only changes it for the current session, not in the YAML file
+            settings().ollama.llm_model = model_name
+            self._current_model = model_name
+            logger.info(f"Changed model to: {model_name}")
+            
+            # Return message and JS to refresh the page
+            refresh_js = """
+            setTimeout(function() {
+                window.location.reload();
+            }, 1500);
+            """
+            return [
+                gr.update(value=f"Changing model to: {model_name}. Page will refresh..."),
+                gr.update(value=refresh_js)
+            ]
+        except Exception as e:
+            logger.error(f"Error changing model: {e}")
+            return [
+                gr.update(value=f"Error changing model: {e}"),
+                gr.update(value="")
+            ]
+
+    # Function to save the current model selection to the settings file
+    def _save_model_to_config(self) -> str:
+        """Save the current model selection to the settings-ollama.yaml file."""
+        try:
+            config_file = Path(PROJECT_ROOT_PATH) / "settings-ollama.yaml"
+            if not config_file.exists():
+                return "Error: settings-ollama.yaml file not found"
+                
+            # Read the current config
+            with open(config_file, "r") as file:
+                config = yaml.safe_load(file)
+                
+            # Update the model
+            if "ollama" in config:
+                config["ollama"]["llm_model"] = self._current_model
+                
+                # Write back to file
+                with open(config_file, "w") as file:
+                    yaml.dump(config, file, default_flow_style=False)
+                
+                return f"Model {self._current_model} saved to configuration file"
+            else:
+                return "Error: 'ollama' section not found in configuration"
+        except Exception as e:
+            logger.error(f"Error saving model to config: {e}")
+            return f"Error saving model to config: {e}"
+
+    # Function to refresh the model list
+    def _refresh_model_list(self) -> list[str]:
+        """Refresh the list of available Ollama models."""
+        models = self._get_available_ollama_models()
+        return gr.update(choices=models, value=self._current_model)
+
     def _build_ui_blocks(self) -> gr.Blocks:
         logger.debug("Creating the UI blocks")
         with gr.Blocks(
@@ -406,6 +490,51 @@ class PrivateGptUi:
                         max_lines=3,
                         interactive=False,
                     )
+                    
+                    # Add Model Selector UI for Ollama models
+                    if settings().llm.mode == "ollama":
+                        with gr.Row():
+                            model_selector = gr.Dropdown(
+                                choices=self._get_available_ollama_models(), 
+                                label="LLM Model",
+                                value=self._current_model,
+                                interactive=True
+                            )
+                            model_change_button = gr.Button("Change Model", size="sm")
+                            
+                        with gr.Row():
+                            refresh_models_button = gr.Button("Refresh Model List", size="sm")
+                            save_config_button = gr.Button("Save Model to Config", size="sm")
+                        
+                        model_status = gr.Textbox(
+                            label="Model Status", 
+                            value=f"Current model: {self._current_model}",
+                            interactive=False
+                        )
+                        
+                        # JavaScript component to handle page refresh
+                        js_refresh = gr.Javascript(visible=False)
+                        
+                        # Setup button click handlers
+                        model_change_button.click(
+                            fn=self._change_model,
+                            inputs=model_selector,
+                            outputs=[model_status, js_refresh]
+                        )
+                        
+                        refresh_models_button.click(
+                            fn=self._refresh_model_list,
+                            inputs=[],
+                            outputs=model_selector
+                        )
+                        
+                        # Add a button to save the model selection to the config file
+                        save_config_button.click(
+                            fn=self._save_model_to_config,
+                            inputs=[],
+                            outputs=model_status
+                        )
+                    
                     upload_button = gr.components.UploadButton(
                         "Upload File(s)",
                         type="filepath",
