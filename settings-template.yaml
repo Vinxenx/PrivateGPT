@@ -1,0 +1,34 @@
+## MODELL-KONFIGURATIONSTEMPLATE
+## Kopieren Sie diese Datei und benennen Sie sie um in settings-modellname.yaml
+## Ersetzen Sie MODELLNAME durch den tatsächlichen Namen des Modells in Ollama
+
+server:
+  env_name: ${APP_ENV:MODELLNAME}
+
+llm:
+  mode: ollama
+  max_new_tokens: 512           # Passen Sie je nach Modell an
+  context_window: 3900          # Passen Sie je nach Modell an
+  temperature: 0.1              # Höherer Wert für kreativere Antworten, niedriger für faktenbasierte
+
+embedding:
+  mode: ollama
+
+ollama:
+  llm_model: MODELLNAME         # Der tatsächliche Modellname in Ollama
+  embedding_model: nomic-embed-text
+  api_base: http://localhost:11434
+  embedding_api_base: http://localhost:11434
+  keep_alive: 5m
+  tfs_z: 1.0                    # Tail Free Sampling Parameter
+  top_k: 40                     # Anpassen für qualitativ bessere Antworten
+  top_p: 0.9                    # Anpassen für qualitativ bessere Antworten
+  repeat_last_n: 64             # Wie weit zurück das Modell schauen soll
+  repeat_penalty: 1.2           # Wie stark Wiederholungen bestraft werden
+  request_timeout: 120.0        # Zeitlimit für Anfragen
+
+vectorstore:
+  database: qdrant
+
+qdrant:
+  path: local_data/private_gpt/qdrant 
